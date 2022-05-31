@@ -1,5 +1,5 @@
 from collections import UserDict
-from typing import List, Tuple
+from typing import List
 
 EXIT_COMMANDS = ('good bye', 'close', 'exit')
 
@@ -17,7 +17,7 @@ class Name(Field):
 
 
 class Phone(Field):
-    def __init__(self, phone: str) -> None:
+    def __init__(self, phone: str = '') -> None:
         self.phone = phone
 
     def get_phone(self) -> str:
@@ -29,17 +29,17 @@ class Record:
         self.name: Name = name
         self.phone_list: List[Phone] = []
 
-    def add_phone(self, phone: Phone) -> None:
+    def add_phone(self, phone: Phone) -> str:
         if phone in self.phone_list:
             return f"Name '{self.name}' is already in contacts!\n" \
                    "Try another name or change existing contact"
         self.phone_list.append(phone)
         return "Phone was added successfully!"
 
-    def get_phones(self) -> str:
+    def get_phones(self) -> str:  # return phones in one string
         return ', '.join([phone.get_phone() for phone in self.phone_list])
 
-    def remove_phone(self, phone: Phone) -> None:
+    def remove_phone(self, phone: Phone) -> str:
         if phone.get_phone() not in [el.get_phone() for el in self.phone_list]:
             return "Phone can't be removed: it's not in the list of the contact!"
         for el in self.phone_list:
@@ -47,7 +47,7 @@ class Record:
                 self.phone_list.remove(el)
         return "Phone was removed successfully!"
 
-    def edit_phone(self, phone: Phone, new_phone: Phone) -> None:
+    def edit_phone(self, phone: Phone, new_phone: Phone) -> str:
         if phone.get_phone() not in [el.get_phone() for el in self.phone_list]:
             return "Phone can't be changed: it's not in the list of the contact!"
         for el in self.phone_list:
@@ -60,6 +60,9 @@ class Record:
 class AddressBook(UserDict):
     def __init__(self):
         super().__init__()
+
+    def add_record(self, name: str, record: Record) -> None:
+        self.data[name] = record
 
 
 # This decorator handles correctness of the phone number: can start with '+'
@@ -97,10 +100,12 @@ def func_arg_error(func):
             f_name = func.__name__
             if f_name in ('exit_program', 'hello', 'show_all_phones'):
                 return "ERROR: This command has to be written without arguments!"
-            if f_name in ('add_contact', 'edit_phone'):
-                return "ERROR: This command needs 2 arguments: 'name' and 'phone' separated by 1 space!"
             if f_name == 'show_phone':
                 return "ERROR: This command needs 1 arguments: 'name' separated by 1 space!"
+            if f_name in ('add_contact', 'remove_phone'):
+                return "ERROR: This command needs 2 arguments: 'name' and 'phone' separated by 1 space!"
+            if f_name in ('edit_phone',):
+                return "ERROR: This command needs 3 arguments: 'name', 'phone' and 'new_phone' separated by 1 space!"
 
     return wrapper
 
@@ -122,7 +127,7 @@ def add_contact(contacts: AddressBook, name: str, phone: str) -> str:
 
     contact_record = Record(n)
     contact_record.add_phone(p)
-    contacts.data[name] = contact_record
+    contacts.add_record(name, contact_record)
     return f"Contact was created successfully!"
 
 
@@ -141,6 +146,9 @@ def edit_phone(contacts: AddressBook, name: str, phone: str, new_phone: str) -> 
 @input_error
 @func_arg_error
 def remove_phone(contacts: AddressBook, name: str, phone: str) -> str:
+    """
+    Remove phone number from the contact. But doesn't remove contact itself if it has no phone numbers.
+    """
     if name not in contacts.data.keys():
         return f"There is no contact with name '{name}'"
 
@@ -173,14 +181,14 @@ def exit_program():
     return "Good bye!"
 
 
-def choose_command(cmd: str):
+def choose_command(cmd: str) -> tuple:
     if cmd in EXIT_COMMANDS:
-        return exit_program, None
+        return exit_program, []
 
     cmd = parse_command(cmd)
     cmd_check = cmd[0].lower()
     if cmd_check == 'hello':
-        return hello, None
+        return hello, cmd[1:]
     if cmd_check == 'add':
         return add_contact, cmd[1:]
     if cmd_check == 'change':
@@ -201,18 +209,12 @@ def parse_command(cmd: str) -> list:
     return cmd.strip().split(' ')  # apply strip() as well to exclude spaces at the ends
 
 
-def handle_cmd(cmd: str, contacts: AddressBook):
+def handle_cmd(cmd: str, contacts: AddressBook) -> tuple:
     func, result = choose_command(cmd)
-
     if func:
         # else part to take into account hello() and show()
-        args = [contacts] + result if func not in (hello, exit_program) else []
+        args = [contacts] + result if func not in (hello, exit_program) else result
         result = func(*args)
-
-    # to prevent exit script if exit function finishes with error
-    # also was thinking about how to handle this with exceptions... but decided to leave it as is
-    # if 'ERROR' in result:
-    #     func = None
     return func, result
 
 
@@ -222,7 +224,6 @@ def main():
 
     while True:
         command = None
-
         # Check if command is not empty
         while not command:
             command = input('Enter command: ')
