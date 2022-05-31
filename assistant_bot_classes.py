@@ -16,6 +16,7 @@ def input_error(func):
             # and if it contains only digits by int()
             if int(phone_check) < 0:
                 raise ValueError
+                return 1
         except ValueError:
             return "ERROR: Phone can or couldn't start with '+' and then must contain only digits!\n \
                     Example: +380..., 380..."
@@ -34,7 +35,7 @@ def func_arg_error(func):
             return result
         except TypeError:
             f_name = func.__name__
-            if f_name in ('hello', 'show_all_phones'):
+            if f_name in ('exit_program', 'hello', 'show_all_phones'):
                 return "ERROR: This command has to be written without arguments!"
             if f_name in ('add_phone', 'change_phone'):
                 return "ERROR: This command needs 2 arguments: 'name' and 'phone' separated by 1 space!"
@@ -86,16 +87,17 @@ def show_all_phones() -> str:
     return '\n'.join(["{:<10}: {:<10}".format(name, phone) for name, phone in CONTACTS.items()])
 
 
+@func_arg_error
 def exit_program():
     return "Good bye!"
 
 
-def choose_command(cmd: list):
-    if cmd in EXIT_COMMANDS:
-        return exit_program
-
+def choose_command(cmd: str):
+    # cmd = cmd.strip().split(' ')  # apply strip() as well to exclude spaces at the ends
     cmd_check = cmd[0].lower()
 
+    if cmd_check in EXIT_COMMANDS:
+        return exit_program
     if cmd_check == 'hello':
         return hello
     if cmd_check == 'add':
@@ -112,11 +114,21 @@ def choose_command(cmd: list):
             return show_all_phones
 
 
-def parse_command(cmd: str):
-    cmd = cmd.strip().split(' ')  # apply strip() as well to exclude spaces at the ends
+def parse_command(cmd: str) -> list:
+    return cmd.strip().split(' ')  # apply strip() as well to exclude spaces at the ends
+
+
+def handle_cmd(cmd: str):
+    cmd = parse_command(cmd)
     func, result = choose_command(cmd), "Unknown command!"  # default result
+
     if func:
         result = func(*cmd[1:]) if len(cmd) > 1 else func()  # else part to take into account hello() and show()
+
+    # to prevent exit script if exit function finishes with error
+    # also was thinking about how to handle this with exceptions... but decided to leave it as is
+    if 'ERROR' in result:
+        func = None
     return func, result
 
 
@@ -128,11 +140,11 @@ def main():
         while not command:
             command = input('Enter command: ')
 
-        if command in EXIT_COMMANDS:
-            print("Good bye!")
-            break
+        # if command in EXIT_COMMANDS:
+        #     print("Good bye!")
+        #     break
 
-        func, result = parse_command(command)
+        func, result = handle_cmd(command)
 
         print(result)
 
